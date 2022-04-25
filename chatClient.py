@@ -2,69 +2,72 @@ import socket
 import struct
 import sys
 import threading
+import time
+import getpass
 
-PORT = 1234
-HEADER_LENGTH = 2
-
-
-def receive_fixed_length_msg(sock, msglen):
-    message = b''
-    while len(message) < msglen:
-        chunk = sock.recv(msglen - len(message))  # preberi nekaj bajtov
-        if chunk == b'':
-            raise RuntimeError("socket connection broken")
-        message = message + chunk  # pripni prebrane bajte sporocilu
-
-    return message
+from common import *
 
 
-def receive_message(sock):
-    header = receive_fixed_length_msg(sock,
-                                      HEADER_LENGTH)  # preberi glavo sporocila (v prvih 2 bytih je dolzina sporocila)
-    message_length = struct.unpack("!H", header)[0]  # pretvori dolzino sporocila v int
-
-    message = None
-    if message_length > 0:  # ce je vse OK
-        message = receive_fixed_length_msg(sock, message_length)  # preberi sporocilo
-        message = message.decode("utf-8")
-
-    return message
-
+### MESSAGE TYPES
 
 def send_message(sock, message):
-    encoded_message = message.encode("utf-8")  # pretvori sporocilo v niz bajtov, uporabi UTF-8 kodno tabelo
+	if len(message) >= 1<<14:
+		raise ValueError("Message too long")
+	encoded = encode_message(message=message, type=TYPE["public"])
+	sock.sendall(encoded)
 
-    # ustvari glavo v prvih 2 bytih je dolzina sporocila (HEADER_LENGTH)
-    # metoda pack "!H" : !=network byte order, H=unsigned short
-    header = struct.pack("!H", len(encoded_message))
+def send_dm(sock, message, recipient):
+	if len(message) >= 1<<14:
+		raise ValueError("Message too long")
+	if len(recipient) >= 1<<8:
+		raise ValueError("Recipient name too long")
+	encoded = encode_message(message=message, type=TYPE["private"], user=recipient)
+	sock.sendall(encoded)
 
-    message = header + encoded_message  # najprj posljemo dolzino sporocilo, slee nato sporocilo samo
-    sock.sendall(message);
+def send_name(sock, username):
+	if len(username) >= 1<<8:
+		raise ValueError("Username too long")
+	encoded = encode_message(type=TYPE["username"], user=username)
+	sock.sendall(encoded)
 
+###
 
 # message_receiver funkcija tece v loceni niti
 def message_receiver():
-    while True:
-        msg_received = receive_message(sock)
-        if len(msg_received) > 0:  # ce obstaja sporocilo
-            print("[RKchat] " + msg_received)  # izpisi
+	while True:
+		msg = receive_message(sock)
+		print(format_message(msg))
 
+def handle_error(msg):
+	if (msg["code"] == ERRORS["invalid_username"]):
+		change_username()
+	if (msg["code"] == ERRORS["banned"]):
+		sys.exit(0)
 
-# povezi se na streznik
-print("[system] connecting to chat server ...")
+def change_username():
+	username = input("Enter a username: ")
+	send_name(sock, username)
+
+# connect to the server
+print("[LOCAL] connecting to chat server ...")
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect(("localhost", PORT))
-print("[system] connected!")
+print("[LOCAL] connected!")
 
-# zazeni message_receiver funkcijo v loceni niti
+# begin receiving messages
 thread = threading.Thread(target=message_receiver)
 thread.daemon = True
 thread.start()
 
-# pocakaj da uporabnik nekaj natipka in poslji na streznik
+# select username
+change_username()
+
+# await input
 while True:
-    try:
-        msg_send = input("")
-        send_message(sock, msg_send)
-    except KeyboardInterrupt:
-        sys.exit()
+	try:
+		time.sleep(0.1)
+		msg_send = input("> ")
+		print("\b\r\b\r", end="")
+		send_message(sock, msg_send)
+	except KeyboardInterrupt:
+		sys.exit(0)
