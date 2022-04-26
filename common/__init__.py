@@ -4,7 +4,7 @@ import datetime
 
 PORT = 1234
 TYPE = {"public": 0, "private": 1, "error": 2, "username": 3}
-ERRORS = {"invalid_username": 1}
+ERRORS = {"invalid_username": 1, "banned": 2}
 
 def receive_fixed_length_msg(sock, msglen):
 	message = b''
@@ -70,7 +70,7 @@ def encode_message(message="", type=TYPE["public"], user="", code=None):
 	# <=little endian (for incompatibility)
 	# H=unsigned short (2B) - type (2b) + msg_length (14b)
 	# I=unsigned int (4B) - timestamp
-	# B=unsigned char (1B) - code (error_code / recipient / username)
+	# B=unsigned char (1B) - code (error_code / username_length)
 	header = struct.pack("<HIB", msg_type_and_length, timestamp, code)
 
 	return header + encoded_message + user
@@ -98,4 +98,4 @@ def format_message(msg):
 			message=msg['message'],
 		)
 	else: # (msg["type"] == TYPE["username"])
-		pass
+		return "unknown message type: "+str(msg["type"])

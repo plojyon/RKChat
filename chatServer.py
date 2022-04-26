@@ -7,7 +7,55 @@ import threading
 
 from common import *
 
-usernames = {}
+sock_to_uname = {}
+uname_to_sock = {}
+
+def add_user(socket, username):
+	if socket in sock_to_uname:
+		socket.send(encode_message(message="User already has a name", type=TYPE["error"], code=ERRORS["invalid_username"]))
+		return False
+	if username in uname_to_sock:
+		socket.send(encode_message(message="Username is taken", type=TYPE["error"], code=ERRORS["invalid_username"]))
+		return False
+
+	# confirm username with client
+	try:
+		socket.send(encode_message(message="2", type=TYPE["username"], user=username))
+	except:
+		pass
+
+	# broadcast new client to everyone
+	for client in clients:
+		try:
+			client.send(encode_message(message="1", type=TYPE["username"], user=username))
+		except:
+			pass
+
+	# notify new client of all other logged-in users
+	for user in uname_to_sock:
+		try:
+			client_sock.send(encode_message(message="1", type=TYPE["username"], user=user))
+		except:
+			pass
+
+	sock_to_uname[socket] = username
+	uname_to_sock[username] = socket
+
+	return True
+
+def remove_user(socket):
+	username = sock_to_uname[socket]
+
+	# broadcast client loss
+	for client in set(clients) - set([socket]):
+		try:
+			client.send(encode_message(message="0", type=TYPE["username"], user=username))
+		except:
+			pass
+
+	sock_to_uname.pop(socket, None)
+	uname_to_sock.pop(username, None)
+
 
 # funkcija za komunikacijo z odjemalcem (tece v loceni niti za vsakega odjemalca)
 def client_thread(client_sock, client_addr):
@@ -21,22 +69,15 @@ def client_thread(client_sock, client_addr):
 		while True:
 			msg = receive_message(client_sock)
 			if msg["type"] == TYPE["username"]:
-				if client_sock in usernames.values():
-					client_sock.send(encode_message(message="User already has a name", type=TYPE["error"], code=ERRORS["invalid_username"]))
-					continue
-				if msg["username"] in usernames.keys():
-					client_sock.send(encode_message(message="Username is taken", type=TYPE["error"], code=ERRORS["invalid_username"]))
-					continue
-				usernames[msg["username"]] = client_sock
+				add_user(client_sock, msg["username"])
 				continue
 			if msg["type"] == TYPE["error"]:
 				continue
 			if msg["message"] is None or len(msg["message"]) == 0:
 				continue
 
-			my_name = list(usernames.keys())[list(usernames.values()).index(client_sock)]
-			msg["username"] = my_name
-			msg["code"] = len(my_name)
+			msg["username"] = sock_to_uname[client_sock]
+			msg["code"] = len(sock_to_uname[client_sock])
 
 			message = format_message(msg)
 			print("[{ip}:{port}] {message}".format(
@@ -45,15 +86,18 @@ def client_thread(client_sock, client_addr):
 				message=message,
 			))
 
+			# determine set of intended recipients
 			recipients = clients
 			if msg["type"] == TYPE["private"]:
 				recipients = [usernames[msg["username"]]]
 
+			# send message to intended recipients
 			for client in recipients:
-				client.send(encode_message(message=msg["message"], type=msg["type"], user=my_name))
+				client.send(encode_message(message=msg["message"], type=msg["type"], user=sock_to_uname[client_sock]))
 	except ConnectionResetError as e:
 		print(e)
 		print("Deleting client ...")
+		remove_user(client_sock)
 
 	with clients_lock:
 		clients.remove(client_sock)
