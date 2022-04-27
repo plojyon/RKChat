@@ -12,6 +12,10 @@ from common import *
 
 SERVER = ("localhost", PORT)
 username = None
+COLOUR_SETTINGS = {
+    "username": [pycat.cursor.COLOURS.index("red") + pycat.cursor.FOREGROUND],
+    "status": [pycat.cursor.COLOURS.index("green") + pycat.cursor.FOREGROUND],
+}
 
 ### MESSAGE TYPES
 
@@ -99,8 +103,8 @@ def change_username():
 def title_text(left, center, right, available_width):
     width_left = int(math.floor(available_width / 2.0))
     width_right = int(math.ceil(available_width / 2.0))
-    padding_left = width_left - len(left) - int(math.floor(len(center) / 2.0))
-    padding_right = width_right - len(right) - int(math.ceil(len(center) / 2.0))
+    padding_left = width_left - strlen(left) - int(math.floor(strlen(center) / 2.0))
+    padding_right = width_right - strlen(right) - int(math.ceil(strlen(center) / 2.0))
     return left + padding_left * " " + center + padding_right * " " + right
 
 
@@ -109,6 +113,7 @@ def set_status(status):
     text = title_text(
         " " + status, "=== Welcome to RKChat ===", "_  □  X ", available_width
     )
+    text = pycat.cursor.colour(text, COLOUR_SETTINGS["status"])
     status_window.clear()
     status_window.print(text)
     canvas.draw()
@@ -117,7 +122,9 @@ def set_status(status):
 def set_username(uname):
     global username
     log("Login successful.")
-    set_status("Logged in as " + uname)
+    set_status(
+        "Logged in as " + pycat.cursor.colour(uname, COLOUR_SETTINGS["username"])
+    )
     username = uname
 
 
