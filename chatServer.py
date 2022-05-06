@@ -10,7 +10,6 @@ from common import *
 sock_to_uname = {}
 uname_to_sock = {}
 
-
 def add_user(socket, username):
     if socket in sock_to_uname:
         socket.send(
@@ -104,7 +103,7 @@ def client_thread(client_sock, client_addr):
             # format message for logging
             msg["username"] = sock_to_uname[client_sock]
             msg["code"] = len(sock_to_uname[client_sock])
-            message = format_message(msg)
+            message = str(msg)
             print(
                 "[{ip}:{port}] {message}".format(
                     ip=client_addr[0],

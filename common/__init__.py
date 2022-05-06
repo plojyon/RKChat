@@ -81,30 +81,13 @@ def encode_message(message="", type=TYPE["public"], user="", code=None):
 
 def format_ts(timestamp):
     ts = datetime.datetime.fromtimestamp(int(timestamp))
-    return "{hour:0>2}:{minute:0>2}".format(hour=ts.hour, minute=ts.minute)
-
-
-def format_message(msg):
-    if msg["type"] == TYPE["public"]:
-        return "{ts} [{author}] {message}".format(
-            ts=format_ts(msg["timestamp"]),
-            author=msg["username"],
-            message=msg["message"],
-        )
-    elif msg["type"] == TYPE["private"]:
-        return "{ts} ({author}) {message}".format(
-            ts=format_ts(msg["timestamp"]),
-            author=msg["username"],
-            message=msg["message"],
-        )
-    elif msg["type"] == TYPE["error"]:
-        return "{ts} (SERVER) {message}".format(
-            ts=format_ts(msg["timestamp"]),
-            message=msg["message"],
-        )
-    else:  # (msg["type"] == TYPE["username"])
-        return "unknown message type: " + str(msg["type"])
+    return "{hour:0>2}:{minute:0>2}:{second:0>2}".format(
+        hour=ts.hour, minute=ts.minute, second=ts.second
+    )
 
 
 def strlen(s):
-    return len(re.compile(r"\x1b\[[;\d]*[A-Za-z]", re.VERBOSE).sub("", s))
+    return len(s)
+    # if isinstance(s, colour.Colour):
+    #     return len(s)
+    # return len(re.compile(r"\x1b\[[;\d]*[A-Za-z]", re.VERBOSE).sub("", s))
