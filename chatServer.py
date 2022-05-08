@@ -10,6 +10,20 @@ from common import *
 sock_to_uname = {}
 uname_to_sock = {}
 
+lowercase = [chr(i) for i in range(ord("a"), ord("z") + 1)]
+uppercase = [i.upper() for i in lowercase]
+digits = [str(i) for i in range(10)]
+special = ["_", "-"]
+legal_characters = lowercase + uppercase + digits + special
+
+
+def validate_username(username):
+    for ch in username:
+        if ch not in legal_characters:
+            return False
+    return True
+
+
 def add_user(socket, username):
     if socket in sock_to_uname:
         socket.send(
@@ -24,6 +38,16 @@ def add_user(socket, username):
         socket.send(
             encode_message(
                 message="Username is taken",
+                type=TYPE["error"],
+                code=ERRORS["invalid_username"],
+            )
+        )
+        return False
+    if not validate_username(username):
+        socket.send(
+            encode_message(
+                message="Username contains illegal characters. Allowed characters: "
+                + str(legal_characters),
                 type=TYPE["error"],
                 code=ERRORS["invalid_username"],
             )
@@ -98,7 +122,16 @@ def client_thread(client_sock, client_addr):
             # determine set of intended recipients
             recipients = clients
             if msg["type"] == TYPE["private"]:
-                recipients = [uname_to_sock[msg["username"]], client_sock]
+                if msg["username"] in uname_to_sock:
+                    recipients = [uname_to_sock[msg["username"]]]
+                else:
+                    client.send(
+                        encode_message(
+                            message="Trying to DM a nonexistent user",
+                            type=TYPE["error"],
+                            code=ERRORS["dm_not_found"],
+                        )
+                    )
 
             # format message for logging
             msg["username"] = sock_to_uname[client_sock]
@@ -126,6 +159,10 @@ def client_thread(client_sock, client_addr):
                     pass
     except ConnectionResetError as e:
         print(e)
+        print("Deleting client ...")
+        remove_user(client_sock)
+    except RuntimeError as e:
+        print(e)  # socket connection broken
         print("Deleting client ...")
         remove_user(client_sock)
 

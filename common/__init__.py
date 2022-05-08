@@ -5,7 +5,7 @@ import re
 
 PORT = 1234
 TYPE = {"public": 0, "private": 1, "error": 2, "username": 3}
-ERRORS = {"invalid_username": 1, "banned": 2}
+ERRORS = {"invalid_username": 1, "dm_not_found": 2}
 
 
 def receive_fixed_length_msg(sock, msglen):
