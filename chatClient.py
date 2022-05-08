@@ -1,17 +1,22 @@
+import math
 import socket
 import struct
 import sys
 import threading
 import time
-import getpass
-import math
 
 import pycat
-from pycat import windows
-from pycat import colour
 from common import *
+from pycat import colour, windows
 
-SERVER = ("localhost", PORT)
+if len(sys.argv) > 1:
+    server_address = sys.argv[1].split(":")[0]
+    server_port = int(sys.argv[1].split(":")[1])
+else:
+    server_address = "localhost"
+    server_port = 1234
+SERVER = (server_address, server_port)
+
 username = None
 COLOUR_SETTINGS = {
     # status bar

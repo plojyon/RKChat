@@ -1,11 +1,12 @@
 import signal
-
-signal.signal(signal.SIGINT, signal.SIG_DFL)
 import socket
 import struct
+import sys
 import threading
 
 from common import *
+
+signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 sock_to_uname = {}
 uname_to_sock = {}
@@ -172,12 +173,19 @@ def client_thread(client_sock, client_addr):
     client_sock.close()
 
 
+if len(sys.argv) > 1:
+    server_address = sys.argv[1].split(":")[0]
+    server_port = int(sys.argv[1].split(":")[1])
+else:
+    server_address = "localhost"
+    server_port = 1234
+
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-server_socket.bind(("localhost", PORT))
+server_socket.bind((server_address, server_port))
 server_socket.listen(1)
 
-print("[system] listening ...")
+print("[system] listening @ " + str((server_address, server_port)))
 clients = set()
 clients_lock = threading.Lock()
 while True:

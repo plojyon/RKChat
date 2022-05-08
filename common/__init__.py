@@ -1,7 +1,7 @@
-import time
-import struct
 import datetime
 import re
+import struct
+import time
 
 PORT = 1234
 TYPE = {"public": 0, "private": 1, "error": 2, "username": 3}
