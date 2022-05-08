@@ -1,0 +1,3 @@
+[submodule "pycat"]
+	path = pycat
+	url = git@github.com:plojyon/pycat.git
