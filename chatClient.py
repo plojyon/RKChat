@@ -1,5 +1,7 @@
 import math
+import os
 import socket
+import ssl
 import struct
 import sys
 import threading
@@ -116,7 +118,7 @@ def message_receiver():
 def handle_error(msg):
     if msg["code"] == ERRORS["invalid_username"]:
         log(msg["message"])
-        change_username()
+        exit(1)
     if msg["code"] == ERRORS["dm_not_found"]:
         log("Error: " + msg["message"])
 
@@ -127,12 +129,6 @@ def get_input(prompt):
     pos = input_window.position
     pycat.cursor.move(*input_window.inner_position)
     return input(prompt)
-
-
-def change_username():
-    username = get_input("Enter a username: ")
-    input_window.print("Logging in ...")
-    send_name(sock, username)
 
 
 def title_text(left, center, right, available_width):
@@ -207,6 +203,33 @@ def set_username(uname):
     username = uname
 
 
+def select_cert_file():
+    filename = ""
+    while not os.path.exists(filename + ".crt") or not os.path.exists(
+        filename + ".key"
+    ):
+        filename = get_input("Enter the path to the cert file without extension: ")
+        if not os.path.exists(filename + ".crt"):
+            log("Cannot find file " + filename + ".crt")
+        if not os.path.exists(filename + ".key"):
+            log("Cannot find file " + filename + ".key")
+    return filename
+
+
+def setup_SSL_context(cert_file):
+    # uporabi samo TLS, ne SSL
+    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    # certifikat je obvezen
+    context.verify_mode = ssl.CERT_REQUIRED
+    # nalozi svoje certifikate
+    context.load_cert_chain(certfile=cert_file + ".crt", keyfile=cert_file + ".key")
+    # nalozi certifikate CAjev (samopodp. cert.= svoja CA!)
+    context.load_verify_locations("certs/server.crt")
+    # nastavi SSL CipherSuites (nacin kriptiranja)
+    context.set_ciphers("ECDHE-RSA-AES128-GCM-SHA256")
+    return context
+
+
 sidebar_width = 30
 connected_users = []
 
@@ -235,15 +258,20 @@ if len(sys.argv) > 1 and sys.argv[1] == "help":
     interactive_help()
     sys.exit(0)
 
+# find cert file
+cert_file = select_cert_file()
+log("Using cert file: " + cert_file)
 
 set_status(colour.Colour("Connecting ...", COLOUR_SETTINGS["error"]), redraw=False)
 log("Connecting to " + colour.Colour(str(SERVER), COLOUR_SETTINGS["ip"]) + " ...")
 
 while True:
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        my_ssl_ctx = setup_SSL_context(cert_file)
+        sock_insecure = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock = my_ssl_ctx.wrap_socket(sock_insecure)
         sock.connect(SERVER)
-    except Exception as e:
+    except RuntimeError:  # Exception as e:
         set_status(str(e))
         log(str(e))
         get_input("Press Enter to attempt to reconnect or Ctrl-C to quit.")
@@ -258,12 +286,6 @@ log("Connected.")
 thread = threading.Thread(target=message_receiver)
 thread.daemon = True
 thread.start()
-
-# select username
-change_username()
-
-while username is None:
-    time.sleep(0.1)
 
 # await input
 while True:

@@ -1,5 +1,6 @@
 import signal
 import socket
+import ssl
 import struct
 import sys
 import threading
@@ -16,6 +17,21 @@ uppercase = [i.upper() for i in lowercase]
 digits = [str(i) for i in range(10)]
 special = ["_", "-"]
 legal_characters = lowercase + uppercase + digits + special
+
+
+def setup_SSL_context():
+    # uporabi samo TLS, ne SSL
+    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    # certifikat je obvezen
+    context.verify_mode = ssl.CERT_REQUIRED
+    # nalozi svoje certifikate
+    context.load_cert_chain(certfile="certs/server.crt", keyfile="certs/server.key")
+    # nalozi certifikate CAjev, ki jim zaupas
+    # (samopodp. cert. = svoja CA!)
+    context.load_verify_locations("clients.pem")
+    # nastavi SSL CipherSuites (nacin kriptiranja)
+    context.set_ciphers("ECDHE-RSA-AES128-GCM-SHA256")
+    return context
 
 
 def validate_username(username):
@@ -49,6 +65,15 @@ def add_user(socket, username):
             encode_message(
                 message="Username contains illegal characters. Allowed characters: "
                 + str(legal_characters),
+                type=TYPE["error"],
+                code=ERRORS["invalid_username"],
+            )
+        )
+        return False
+    if username == "":
+        socket.send(
+            encode_message(
+                message="Missing username. Client certificate should include a commonName field.",
                 type=TYPE["error"],
                 code=ERRORS["invalid_username"],
             )
@@ -112,9 +137,9 @@ def client_thread(client_sock, client_addr):
     try:
         while True:
             msg = receive_message(client_sock)
-            if msg["type"] == TYPE["username"]:
-                add_user(client_sock, msg["username"])
-                continue
+            # if msg["type"] == TYPE["username"]:
+            #     add_user(client_sock, msg["username"])
+            #     continue
             if msg["type"] == TYPE["error"]:
                 continue
             if msg["message"] is None or len(msg["message"]) == 0:
@@ -180,6 +205,7 @@ else:
     server_address = "localhost"
     server_port = 1234
 
+ssl_context = setup_SSL_context()
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server_socket.bind((server_address, server_port))
@@ -192,8 +218,18 @@ while True:
     try:
         # pocakaj na novo povezavo - blokirajoc klic
         client_sock, client_addr = server_socket.accept()
+        client_sock = ssl_context.wrap_socket(client_sock, server_side=True)
         with clients_lock:
             clients.add(client_sock)
+
+        cert = client_sock.getpeercert()
+        username = ""
+        for sub in cert["subject"]:
+            for key, value in sub:
+                # v commonName je ime uporabnika
+                if key == "commonName":
+                    username = value
+        add_user(client_sock, username)
 
         thread = threading.Thread(target=client_thread, args=(client_sock, client_addr))
         thread.daemon = True
@@ -201,6 +237,10 @@ while True:
 
     except KeyboardInterrupt:
         break
+
+    except ssl.SSLCertVerificationError:
+        print("Attempted connection from unverified client. Connection dropped.")
+        pass
 
 print("[system] closing server socket ...")
 server_socket.close()

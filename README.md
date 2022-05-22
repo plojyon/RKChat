@@ -6,8 +6,17 @@ Pogovorna aplikacija za RK.
 Odjemalec: `python3 chatClient.py` ali `python3 chatClient.py ip:port`  
 Strežnik: `python3 chatServer.py` ali `python3 chatServer.py ip:port`  
 
+Za testiranje so priloženi uporabniški certifikati `certs/asistent`, `certs/yon`, `certs/masa` in `certs/mallory`. Slednji ni registriran na strežniku.
+
+## Navodilo za generiranje uporabniškega certifikata
+1. Uporabite ukaz `openssl req -new -newkey rsa:2048 -days 365 -nodes -sha256 -x509 -keyout uporabnik.key -out uporabnik.crt`.
+
+2. Sledite navodilom v ukaznem pozivu. V polje Common Name vnesite željeno uporabniško ime. Dovoljene so male in velike črke angleške abecede in znaka "_" ter "-".
+
+3. Vsebino datoteke `uporabnik.crt` mora strežniški administrator ročno dodati v `clients.pem`.
+
 ## Navodila za uporabo
-1. Pridružite se aplikaciji za klepet tako, da vnesete svoje uporabniško ime. Dovoljene so male in velike črke angleške abecede in znaka "_" ter "-".
+1. Pridružite se aplikaciji za klepet tako, da vnesete pot do certifikata brez končnice (npr. `certs/asistent` ali `uporabnik`).
 
 2. Vnesite svoje sporočilo v besedilno polje, da začnete klepetati z drugimi.
 
